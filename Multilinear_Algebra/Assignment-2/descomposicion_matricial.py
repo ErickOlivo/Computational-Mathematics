@@ -14,7 +14,7 @@ def gram_schmidt_modificado(X):
 
     m, n = X.shape
     Q = X.copy().astype(float)  # Copiar la matriz original
-    R = np.zeros((n, n))
+    R = np.zeros((n, n))        # Se inicializa matriz R con ceros
 
     for j in range(n):
         # Paso 1: Calcular la norma del j-ésimo vector
@@ -34,6 +34,7 @@ def gram_schmidt_modificado(X):
 
 def cociente_rayleigh(A, x):
     """
+    Para cacular valores propios
     Entrada:
         A: Matriz cuadrada (numpy array).
         x: Vector no nulo (numpy array).
@@ -59,21 +60,21 @@ def metodo_potencia(A, v=None, tol = 1e-6, max_iter = 5000):
     """
     n = A.shape[0]
     if v is None:
-        v = np.ones(n)
+        v = np.ones(n)        # Vector inicial con todos unos
     v = v / np.linalg.norm(v)  # Normalizar el vector inicial
     lambda_prev = 0
-    converged = False
+    converged = False           # Funciona como flag de convergencia
 
     for i in range(max_iter):
-        v_new = A @ v
-        v_new = v_new / np.linalg.norm(v_new)
+        v_new = A @ v        # Multiplicación matriz-vector
+        v_new = v_new / np.linalg.norm(v_new)    # Normalización
         lambda_new = cociente_rayleigh(A, v_new)  # Usando tu función
 
         if np.abs(lambda_new - lambda_prev) < tol:
             converged = True
             break
 
-        lambda_prev, v = lambda_new, v_new
+        lambda_prev, v = lambda_new, v_new        # Actualizar para siguiente i
 
     if not converged:
         print("No se alcanzó la convergencia con el número máximo de iteraciones.")
@@ -93,7 +94,7 @@ def descomposicion_schur(A, tol=1e-10, max_iter=10000):
     """
 
     n = A.shape[0]
-    if n == 1:
+    if n == 1:        # Caso base para recursión
         return np.array([[1.0]]), A.copy()
 
     # Paso 1: Encontrar vector propio dominante
