@@ -98,14 +98,24 @@ def descomposicion_schur(A, tol=1e-10, max_iter=10000):
 
     # Paso 1: Encontrar vector propio dominante
     _, lambda_val, v = metodo_potencia(A, tol=tol, max_iter=max_iter)
-    v = v.reshape(-1, 1) / np.linalg.norm(v)
+    
+    '''
+    v.reshape(-1, 1) transforma un vector fila o columna en una matriz de una sola columna
+    En este caso se convierte en un vector columna (n,1)
+    '''
+    v = v.reshape(-1, 1) / np.linalg.norm(v) # Vector propio dominante normalizado
 
     # Paso 2: Completar base ortonormal de forma más estable
     Q = np.eye(n)
-    Q[:, 0] = v.flatten()
+    
+    Q[:, 0] = v.flatten() # Primera columna = vector propio
     for i in range(1, n):
-        Q[:, i] = np.random.randn(n)
-    Q, _ = gram_schmidt_modificado(Q)
+        '''
+        Se normaliza la primera columna Q[:,0]
+        Para cada columna se resta la proyección de Q[:,j] sobre todas las columnas anteriores Q[:,0],...,[Q[:,j-1]
+        '''
+        Q[:, i] = np.random.randn(n) # Rellena con vector aleatorios
+    Q, _ = gram_schmidt_modificado(Q) # Ortogonaliza toda la matriz
 
     # Paso 3: Calcular T = Q^T A Q
     T = Q.T @ A @ Q
