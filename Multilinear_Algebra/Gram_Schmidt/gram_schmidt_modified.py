@@ -1,41 +1,52 @@
 import numpy as np
 
-def gram_schmidt_modificado(X):
-    """
-    Entrada:
-    X (np.array): Matriz de entrada donde cada columna es un vector.
+def gram_schmidt_modificado(A):
+    m, n = A.shape
 
-    Salida:
-    Q (np.array): Matriz con columnas ortonormales.
-    R (np.array): Matriz triangular superior.
-    """
-    m, n = X.shape
-    Q = X.copy().astype(float)  # Copiar la matriz original
-    R = np.zeros((n, n))
+    Q = np.zeros((m,n))
+    R = np.zeros((n,n))
 
-    for j in range(n):
-        # Paso 1: Calcular la norma del j-ésimo vector
-        R[j, j] = np.linalg.norm(Q[:, j])
-        if np.isclose(R[j, j], 0):
-            raise ValueError(f"Vectores linealmente dependientes en columna {j+1}.")
 
-        # Paso 2: Normalizar el j-ésimo vector para obtener q_j
-        Q[:, j] = Q[:, j] / R[j, j]
+    R[0,0] = np.linalg.norm(A[:, 0])
 
-        # Paso 3: Ortogonalizar los vectores posteriores contra q_j
-        for i in range(j+1, n):
-            R[j, i] = np.dot(Q[:, j], Q[:, i])  # Producto interno
-            Q[:, i] = Q[:, i] - R[j, i] * Q[:, j]  # Actualización inmediata
+    if R[0,0] < 1e-12:
+        print("Stop")
+        print("Primer vector es LD")
+        return
+
+    else:
+        Q[: ,0] = A[:, 0] / R[0,0] # Asigno la columna completa del vector normalizado como q_{1}
+
+
+    for j in range(1, n):
+        q_hat = A[:, j]
+
+        """
+        Ya no hay una sumatoria explícita, en vez de acumular y luego restar:
+        Proyección sobre Q[:, i]
+        Restar enseguida esa proyección
+        Seguir al siguiente Q[:, i]
+
+        Esa actualización inmediata en cada paso ayuda a mantener la ortogonalidad
+        """
+        for i in range(j):
+            R[i,j] = np.dot(q_hat, Q[:, i]) # Q[:, i] porque se busca el i-ésimo vector columna
+            q_hat = q_hat - R[i,j]*Q[:, i]
+
+        R[j,j] = np.linalg.norm(q_hat)
+
+        if R[j,j] < 1e-12: # No pongo if R[j,j] == 0, para evitar errores de redondeo
+            print("Stop")
+            print("Vector columna LD")
+            return
+        else:
+            Q[:, j] = q_hat / R[j,j]
 
     return Q, R
 
+A = np.random.rand(4, 3)
+
+Q, R = gram_schmidt_modificado(A)
 
 
-X = np.array([[1, 1],
-              [1, 0]], dtype=float).T  # Vectores en columnas
-
-Q, R = gram_schmidt_modificado(X)
-
-print("Q (ortonormal):\n", np.round(Q, 4))
-print("\nR (triangular superior):\n", np.round(R, 4))
-print("\nVerificación QR ≈ X:\n", np.round(Q @ R, 2))
+print(f" A - QR = ", np.linalg.norm(A - Q@R))

@@ -1,164 +1,119 @@
 import numpy as np
 
-def gram_schmidt_modificado(X):
-    """
-    Entrada:
-    X (np.array): Matriz de entrada donde cada columna es un vector.
+def gram_schmidt_modificado(A):
+    m, n = A.shape
 
-    Salida:
-    Q (np.array): Matriz con columnas ortonormales.
-    R (np.array): Matriz triangular superior.
-    """
-    if X.size == 0:
-        raise ValueError("La matriz de entrada está vacía")
+    Q = np.zeros((m,n))
+    R = np.zeros((n,n))
 
-    m, n = X.shape
-    Q = X.copy().astype(float)  # Copiar la matriz original
-    R = np.zeros((n, n))        # Se inicializa matriz R con ceros
+    R[0,0] = np.linalg.norm(A[:, 0])
 
-    for j in range(n):
-        # Paso 1: Calcular la norma del j-ésimo vector
-        R[j, j] = np.linalg.norm(Q[:, j])
-        if np.isclose(R[j, j], 0):
-            raise ValueError(f"Vectores linealmente dependientes en columna {j+1}.")
+    if R[0,0] < 1e-12:
+        print("Stop")
+        print("Primer vector es LD")
+        return
 
-        # Paso 2: Normalizar el j-ésimo vector para obtener q_j
-        Q[:, j] = Q[:, j] / R[j, j]
+    else:
+        Q[: ,0] = A[:, 0] / R[0,0] # Asigno la columna completa del vector normalizado como q_{1}
 
-        # Paso 3: Ortogonalizar los vectores posteriores contra q_j
-        for i in range(j+1, n):
-            R[j, i] = np.dot(Q[:, j], Q[:, i])  # Producto interno
-            Q[:, i] = Q[:, i] - R[j, i] * Q[:, j]  # Actualización inmediata
+
+    for j in range(1, n):
+        q_hat = A[:, j]
+
+        """
+        Ya no hay una sumatoria explícita, en vez de acumular y luego restar:
+        Proyección sobre Q[:, i]
+        Restar enseguida esa proyección
+        Seguir al siguiente Q[:, i]
+
+        Esa actualización inmediata en cada paso ayuda a mantener la ortogonalidad
+        """
+        for i in range(j):
+            R[i,j] = np.dot(q_hat, Q[:, i]) # Q[:, i] porque se busca el i-ésimo vector columna
+            q_hat = q_hat - R[i,j]*Q[:, i]
+
+        R[j,j] = np.linalg.norm(q_hat)
+
+        if R[j,j] < 1e-12: # No pongo if R[j,j] == 0, para evitar errores de redondeo
+            print("Stop")
+            print("Vector columna LD")
+            return
+        else:
+            Q[:, j] = q_hat / R[j,j]
 
     return Q, R
 
-def cociente_rayleigh(A, x):
-    """
-    Para cacular valores propios
-    Entrada:
-        A: Matriz cuadrada (numpy array).
-        x: Vector no nulo (numpy array).
 
-    Salida:
-        Valor del cociente (float).
-    """
-    return np.dot(x.T, np.dot(A, x)) / np.dot(x.T, x)
+def power_method(A, v, tol = 1e-3, max_iter = 10000):
 
-
-def metodo_potencia(A, v=None, tol = 1e-6, max_iter = 5000):
-    """
-    Entrada:
-        A: Matriz cuadrada.
-        tol: Tolerancia para convergencia (opcional).
-        max_iter: Máximo de iteraciones (opcional).
-        v: Vector inicial, si no se especifica se genera aleatorio
-
-    Salida:
-        converged: Bool indicando si convergió.
-        lambda_est: Valor propio dominante estimado.
-        x: Vector propio asociado (normalizado).
-    """
-    n = A.shape[0]
-    if v is None:
-        v = np.ones(n)        # Vector inicial con todos unos
-    v = v / np.linalg.norm(v)  # Normalizar el vector inicial
-    lambda_prev = 0
-    converged = False           # Funciona como flag de convergencia
-
+    lambda0 = 0
+    convyn = 0 # 0 no converge, 1 sí converge
     for i in range(max_iter):
-        v_new = A @ v        # Multiplicación matriz-vector
-        v_new = v_new / np.linalg.norm(v_new)    # Normalización
-        lambda_new = cociente_rayleigh(A, v_new)  # Usando tu función
 
-        if np.abs(lambda_new - lambda_prev) < tol:
-            converged = True
+        v = np.dot(A, v)
+        v = v /np.linalg.norm(v)
+
+        lambda1 = np.dot(np.transpose(v), np.dot(A, v))[0, 0]
+        L = np.abs(lambda0 - lambda1)
+
+        if L < tol:
+            convyn = 1
             break
+        lambda0 = lambda1
 
-        lambda_prev, v = lambda_new, v_new        # Actualizar para siguiente i
-
-    if not converged:
-        print("No se alcanzó la convergencia con el número máximo de iteraciones.")
-    return converged, lambda_new, v_new
-
+    if i == max_iter-1:
+        print("No se alcanzó la convergencia con el número máximo de iteraciones")
+    return convyn, lambda1, v
 
 
-def descomposicion_schur(A, tol=1e-10, max_iter=10000):
-    """
-    Entrada:
-        A: Matriz cuadrada (numpy array).
-        tol: Tolerancia para valores propios.
+def schur_recursive(A, tol=1e-3):
+    n = A.shape[0] #  Solo se usa filas, porque se trabaja con matrices cuadradas
 
-    Salida:
-        Q: Matriz unitaria.
-        T: Matriz triangular superior.
-    """
+    if n == 1:
+        return np.eye(1), A.copy()
 
-    n = A.shape[0]
-    if n == 1:        # Caso base para recursión
-        return np.array([[1.0]]), A.copy()
+    # Paso 1: obtener valor propio dominante y vector propio
+    v0 = np.random.rand(n, 1)
+    _, lambda1, u = power_method(A, v0, tol=tol)
 
-    # Paso 1: Encontrar vector propio dominante
-    _, lambda_val, v = metodo_potencia(A, tol=tol, max_iter=max_iter)
-    
-    '''
-    v.reshape(-1, 1) transforma un vector fila o columna en una matriz de una sola columna
-    En este caso se convierte en un vector columna (n,1)
-    '''
-    v = v.reshape(-1, 1) / np.linalg.norm(v) # Vector propio dominante normalizado
+    # Paso 2: completar u a base ortonormal U = [u, V]
+    u = u.reshape(-1, 1)
+    V = np.eye(n)[:, 1:]
+    U_aux = np.hstack([u, V])
+    Q_U, _ = gram_schmidt_modificado(U_aux)
+    U = Q_U
 
-    # Paso 2: Completar base ortonormal de forma más estable
-    Q = np.eye(n)
-    
-    Q[:, 0] = v.flatten() # Primera columna = vector propio
-    for i in range(1, n):
-        '''
-        Se normaliza la primera columna Q[:,0]
-        Para cada columna se resta la proyección de Q[:,j] sobre todas las columnas anteriores Q[:,0],...,[Q[:,j-1]
-        '''
-        Q[:, i] = np.random.randn(n) # Rellena con vector aleatorios
-    Q, _ = gram_schmidt_modificado(Q) # Ortogonaliza toda la matriz
+    # Paso 3: transformar A -> B = U^H A U (Cambio de base) dando lugar a una nueva matriz similar expresada en términos de los nuevos vectores base (U)
+    B = U.conj().T @ A @ U # El primer valor propio aparecerá en la esquna superior izquierda B[0,0]
 
-    # Paso 3: Calcular T = Q^T A Q
-    T = Q.T @ A @ Q
+    # Paso 4: extraer submatriz (n-1)x(n-1) de abajo a la derecha
+    B_sub = B[1:, 1:]
 
-    # Paso 4: Llamada recursiva
-    Q_sub, T_sub = descomposicion_schur(T[1:, 1:], tol, max_iter)
+    # Paso 5: aplicar recursión a B_sub (n-1)x(n-1)
+    # B se volverá más triangular en cada paso
+    Q1, R1 = schur_recursive(B_sub)
 
-    # Paso 5: Ensamblar matrices finales
-    Q_final = Q @ np.block([[1, np.zeros((1, n-1))],
-                           [np.zeros((n-1, 1)), Q_sub]])
-    T_final = np.block([
-        [T[0, 0], T[0, 1:].reshape(1, -1) @ Q_sub],
-        [np.zeros((n-1, 1)), T_sub]])
+    # Paso 6: construir Q_hat
+    Q_hat = np.eye(n)
+    Q_hat[1:,1:] = Q1
 
-    return Q_final, T_final
+    # Paso 7: R = Q_hat^H B Q_hat
+    R = Q_hat.conj().T @ B @ Q_hat
+
+    # Paso 8: Q = Q_hat @ U
+    Q = U @ Q_hat
+
+    return Q, R
+
+A = np.random.rand(4, 4)
+
+Q, R = schur_recursive(A)
+
+A_reconstruida = Q @ R @ Q.conj().T
 
 
+print(f"A - Q R Q^H: {np.linalg.norm(A - A_reconstruida)}")
+
+print(f"Q^H Q - I: {np.linalg.norm(Q.conj().T @ Q - np.eye(A.shape[0]))}")
 
 
-
-A = np.array([[4, 2, 1],
-              [0, 3, -1],
-              [1, 0, 2]])
-
-# 1. Factorización QR
-Q, R = gram_schmidt_modificado(A)
-print("Factorización QR:")
-print("Q:\n", Q.round(4))
-print("R:\n", R.round(4))
-print("¿Q ortogonal?:", np.allclose(Q.T @ Q, np.eye(3)), "\n")
-
-# 2. Método de la potencia
-converged, lambda_dom, x_dom = metodo_potencia(A, tol=1e-8, max_iter=5000)
-print("Método de la potencia:")
-print("Convergencia:", converged)
-print("Valor propio dominante:", lambda_dom.round(6))
-print("Vector propio asociado:\n", x_dom.round(6), "\n")
-
-# 3. Descomposición de Schur
-Q_schur, T_schur = descomposicion_schur(A)
-print("Descomposición de Schur:")
-print("Q (unitaria):\n", Q_schur.round(4))
-print("¿Q unitaria?:", np.allclose(Q_schur @ Q_schur.T, np.eye(3)))
-print("T (triangular superior):\n", T_schur.round(4))
-print("¿A = Q T Q^T?:", np.allclose(A, Q_schur @ T_schur @ Q_schur.T))
