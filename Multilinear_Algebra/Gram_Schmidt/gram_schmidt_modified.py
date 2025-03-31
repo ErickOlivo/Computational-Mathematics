@@ -1,6 +1,6 @@
 import numpy as np
 
-def gram_schmidt_modificado(A):
+def gram_schmidt_modified(A):
     m, n = A.shape
 
     Q = np.zeros((m,n))
@@ -11,33 +11,33 @@ def gram_schmidt_modificado(A):
 
     if R[0,0] < 1e-12:
         print("Stop")
-        print("Primer vector es LD")
+        print("First vector is linearly dependent")
         return
 
     else:
-        Q[: ,0] = A[:, 0] / R[0,0] # Asigno la columna completa del vector normalizado como q_{1}
-
+        Q[: ,0] = A[:, 0] / R[0,0] # Assign the entire normalized column vector as q_{1}
 
     for j in range(1, n):
         q_hat = A[:, j]
 
         """
-        Ya no hay una sumatoria explícita, en vez de acumular y luego restar:
-        Proyección sobre Q[:, i]
-        Restar enseguida esa proyección
-        Seguir al siguiente Q[:, i]
+        There is no longer an explicit summation. Instead of accumulating and then subtracting:
+        Project onto Q[:, i]
+        Immediately subtract that projection
+        Move on to the next Q[:, i]
 
-        Esa actualización inmediata en cada paso ayuda a mantener la ortogonalidad
+        This immediate update at each step helps maintain orthogonality
         """
+
         for i in range(j):
-            R[i,j] = np.dot(q_hat, Q[:, i]) # Q[:, i] porque se busca el i-ésimo vector columna
+            R[i,j] = np.dot(q_hat, Q[:, i]) # Q[:, i] gets the i-th column vector
             q_hat = q_hat - R[i,j]*Q[:, i]
 
         R[j,j] = np.linalg.norm(q_hat)
 
-        if R[j,j] < 1e-12: # No pongo if R[j,j] == 0, para evitar errores de redondeo
+        if R[j,j] < 1e-12: # Avoid rounding errors by not checking equality to zero
             print("Stop")
-            print("Vector columna LD")
+            print("Column vector is linearly dependent")
             return
         else:
             Q[:, j] = q_hat / R[j,j]
@@ -46,7 +46,7 @@ def gram_schmidt_modificado(A):
 
 A = np.random.rand(4, 3)
 
-Q, R = gram_schmidt_modificado(A)
+Q, R = gram_schmidt_modified(A)
 
 
 print(f" A - QR = ", np.linalg.norm(A - Q@R))

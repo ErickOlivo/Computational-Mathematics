@@ -1,6 +1,6 @@
 import numpy as np
 
-def gram_schmidt_modificado(A):
+def gram_schmidt_modified(A):
     m, n = A.shape
 
     Q = np.zeros((m,n))
@@ -10,33 +10,33 @@ def gram_schmidt_modificado(A):
 
     if R[0,0] < 1e-12:
         print("Stop")
-        print("Primer vector es LD")
+        print("First vector is linearly dependent")
         return
 
     else:
-        Q[: ,0] = A[:, 0] / R[0,0] # Asigno la columna completa del vector normalizado como q_{1}
+        Q[: ,0] = A[:, 0] / R[0,0] # Assign the full normalized column vector as q_{1}
 
 
     for j in range(1, n):
         q_hat = A[:, j]
 
         """
-        Ya no hay una sumatoria explícita, en vez de acumular y luego restar:
-        Proyección sobre Q[:, i]
-        Restar enseguida esa proyección
-        Seguir al siguiente Q[:, i]
+        There is no longer an explicit summation; instead of accumulating and then subtracting:
+        Project onto Q[:, i]
+        Immediately subtract that projection
+        Proceed to the next Q[:, i]
 
-        Esa actualización inmediata en cada paso ayuda a mantener la ortogonalidad
+        This immediate update at each step helps maintain orthogonality
         """
         for i in range(j):
-            R[i,j] = np.dot(q_hat, Q[:, i]) # Q[:, i] porque se busca el i-ésimo vector columna
+            R[i,j] = np.dot(q_hat, Q[:, i]) # Q[:, i] is the i-th column vector
             q_hat = q_hat - R[i,j]*Q[:, i]
 
         R[j,j] = np.linalg.norm(q_hat)
 
-        if R[j,j] < 1e-12: # No pongo if R[j,j] == 0, para evitar errores de redondeo
+        if R[j,j] < 1e-12: # Avoid exact comparison with zero due to rounding
             print("Stop")
-            print("Vector columna LD")
+            print("Column vector is linearly dependent")
             return
         else:
             Q[:, j] = q_hat / R[j,j]
@@ -47,7 +47,7 @@ def gram_schmidt_modificado(A):
 def power_method(A, v, tol = 1e-3, max_iter = 10000):
 
     lambda0 = 0
-    convyn = 0 # 0 no converge, 1 sí converge
+    convyn = 0 # 0: did not converge, 1: converged
     for i in range(max_iter):
 
         v = np.dot(A, v)
@@ -62,45 +62,45 @@ def power_method(A, v, tol = 1e-3, max_iter = 10000):
         lambda0 = lambda1
 
     if i == max_iter-1:
-        print("No se alcanzó la convergencia con el número máximo de iteraciones")
+        print("Convergence not reached within the maximum number of iterations")
     return convyn, lambda1, v
 
 
 def schur_recursive(A, tol=1e-3):
-    n = A.shape[0] #  Solo se usa filas, porque se trabaja con matrices cuadradas
+    n = A.shape[0] # Only row count is used, since A is square
 
     if n == 1:
         return np.eye(1), A.copy()
 
-    # Paso 1: obtener valor propio dominante y vector propio
+    # Step 1: Obtain dominant eigenvalue and eigenvector
     v0 = np.random.rand(n, 1)
     _, lambda1, u = power_method(A, v0, tol=tol)
 
-    # Paso 2: completar u a base ortonormal U = [u, V]
+    # Step 2: Complete u to an orthonormal basis U = [u, V]
     u = u.reshape(-1, 1)
     V = np.eye(n)[:, 1:]
     U_aux = np.hstack([u, V])
-    Q_U, _ = gram_schmidt_modificado(U_aux)
+    Q_U, _ = gram_schmidt_modified(U_aux)
     U = Q_U
 
-    # Paso 3: transformar A -> B = U^H A U (Cambio de base) dando lugar a una nueva matriz similar expresada en términos de los nuevos vectores base (U)
-    B = U.conj().T @ A @ U # El primer valor propio aparecerá en la esquna superior izquierda B[0,0]
+    # Step 3: Transform A -> B = U^H A U (Change of basis), yielding a new similar matrix expressed in the new basis (U)
+    B = U.conj().T @ A @ U # The first eigenvalue will appear in B[0, 0]
 
-    # Paso 4: extraer submatriz (n-1)x(n-1) de abajo a la derecha
+    # Step 4: Extract (n-1)x(n-1) submatrix from bottom-right
     B_sub = B[1:, 1:]
 
-    # Paso 5: aplicar recursión a B_sub (n-1)x(n-1)
-    # B se volverá más triangular en cada paso
+    # Step 5: Apply recursion to B_sub
+    # B becomes more triangular at each step
     Q1, R1 = schur_recursive(B_sub)
 
-    # Paso 6: construir Q_hat
+    # Step 6: Build Q_hat
     Q_hat = np.eye(n)
     Q_hat[1:,1:] = Q1
 
-    # Paso 7: R = Q_hat^H B Q_hat
+    # Step 7: R = Q_hat^H B Q_hat
     R = Q_hat.conj().T @ B @ Q_hat
 
-    # Paso 8: Q = Q_hat @ U
+    # Step 8: Q = U Q_hat
     Q = U @ Q_hat
 
     return Q, R
@@ -109,10 +109,10 @@ A = np.random.rand(4, 4)
 
 Q, R = schur_recursive(A)
 
-A_reconstruida = Q @ R @ Q.conj().T
+A_reconstructed = Q @ R @ Q.conj().T
 
 
-print(f"A - Q R Q^H: {np.linalg.norm(A - A_reconstruida)}")
+print(f"A - Q R Q^H: {np.linalg.norm(A - A_reconstructed)}")
 
 print(f"Q^H Q - I: {np.linalg.norm(Q.conj().T @ Q - np.eye(A.shape[0]))}")
 
