@@ -1,4 +1,3 @@
-You said:
 import numpy as np
 def qr_iterative(A, tol=1e-8, max_iter=1000):
     """
