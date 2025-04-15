@@ -1,211 +1,233 @@
 import numpy as np
 def qr_iterative(A, tol=1e-12, max_iter=1000):
     """
-    Permita transformar una matriz en una forma de Schur en la cual sus autovalores aparecen en la diagonal.
-    A medida que el proceso converge, la matriz resultante muestra estos valores en forma clara.
+    -------------------------------------------------------------------------------------------------------
+    Allows the matrix A to be transformed into a Schur form where its wigenvalues appear on the diagonal.
 
-    Cuando se decompone A = QR y luego se recompone A_k+1 = RQ, se puede demostrar que A_k+1 = Q^T A Q, como Q es ortogonal
-    Q^T Q = I. Esto significa que A_k+1 es similar a A, por lo tanto tienen los mismos autovalores.
+    As the iterative process converges, the resulting matrix clearly dispays these values on the diagonal.
 
-    Este proceso iterativo "empuja" los valores propios hacia la diagonal
+    When we decompose A = QR and then recombine A_{k+1} = RQ, we can show that A_{k+1} = Q^T A Q, since Q
+    is orthogonal (Q^T Q = I). This means A_{k+1} is similar to A, thus they share the same eigenvaluess.
 
-    Por el teorea de Schur si A es real garantiza que A es ortogonalmente similar a una matriz que es casi triangular
-    Q^T A Q = T
+    This interative process "pushes" the eigenvalues to the diagonal.
+
+    By Schur's theorem, if A is real, it guarantees that A is orthogonally similar to  an almost triangular
+    matrix: Q^T A Q = T
+
+    -------------------------------------------------------------------------------------------------------
     """
     n = A.shape[0]
-    U = np.eye(n)    # Acumulador para las transformaciones
+    U = np.eye(n)    # Accumulator for orthogonal transformations
 
     iter = 0
 
     """
-    Continúa hasta que A_k converja a una forma triangular (real) o quasi_triangular por bloques (si hay valores complejos)
+    Continues until A_k converges to a triangular form (real) or quasi-block-triangular (if there are complex values)
 
-    Los valores de la diagonal de la matriz convergida (A_k final) son las aproximaciones a los autovalores
+    The diagonal entries of the converged matrix (final A_k) are the aproximations of the eigenvalues
     """
     while iter < max_iter:
-        # Paso 1: Realizar la descomposición QR de la matriz actual
+        # Step 1: Perform the QR decomposition on the current matrix
         Q, R = np.linalg.qr(A)
-        # Acumular la transformación U (para obtener la matriz ortogonal necesaria)
-        U = np.dot(U, Q)
 
-        # Paso 2: Actualizar la matriz
+        U = np.dot(U, Q) # Accumulate the transformation into U (to build the required orthogonal matrix)
+
+        # Step 2: Update the matrix A = RQ
         A = np.dot(R, Q)
 
-        # Paso 3: Evaluar el criterio de parada
-        # Extraer la parte diagonal de A
-        # np.diag(A) extrae los elementos de la diagonal y devuelve un arreglo 1D con dichos elementos.
-        # np.diag(...) se construye de nuevo una matriz diagonal usando esos elementos.
-        D = np.diag(np.diag(A))
-        # Calcular la norma L1 de los elementos fuera de la diagonal
+        # Step 3: Evaluate the stopping criterion
 
-        """
-        Este error mide cuánto de la matriz A sigue siendo "no diagonal"
-        Cuando eso es muy pequeño, asumimos que A_k ya está casi diagonal, y los autovalores están en la diagonal
-        """
+        D = np.diag(np.diag(A)) # Extract the diagonal part of A
 
-        error = np.sum(np.abs(A - D)) # Determina cuándo la parte no diagonal es suficientemente pequeña
-        # La idea es que cuando esta suma es muy pequeña podemos decir que los elementos fuera de la diagonal han sido reducidos a casi cero.
+        # Compute the L1 norm of the off-diagonal elements
+        error = np.sum(np.abs(A - D)) # Determines when the off-diagonal portion is small enough
+                                      # The idea is that when this sum is very small,
+                                      # we can say the off-diagonal elements are nearly zero.
         if error < tol:
             break
 
         iter += 1
 
-    return U, A # Al salir, A estará casi diagonal y U contiene la acumulación de los Q's, esta U es ortogonal (o unitario en el caso complejo) y contiene los vectores singulares izquierdos de A
-                # Una matriz A que es casi triangular (o diagonal si el proceso converge completamente). Los elementos de la diagonal son aproximaciones a los autovalores originales
-                # En un problema estándar de autovalores, la Schur normal es A = U T U^T si es real
+    return U, A # Upon exiting, A is almost diagonal and U holds the accumulated Q's
 
 
 # ---------------
-# Código principal
+# Main code
 # ---------------
 
-# Paso A: Definir la matriz A original
+# -------------------------------------------------------------------------------
+# Step A: Define the original matrix A
+# -------------------------------------------------------------------------------
 A = np.random.rand(4, 4)
 
-# Hacer una copia para el proceso QR (ya que se modifica A en el proceso)
+# Make a copy for the QR process (since A is modified in-place)
 A_copy = A.copy()
 
-# Paso B: Aplicar QR iterativo para obtener U y la matriz casi diagonal T (denominada A_diag)
+# -------------------------------------------------------------------------------
+# Step B: Apply the iterative QR to get U and the near-diagonal matrix A_diag (T)
+# -------------------------------------------------------------------------------
 U, A_diag = qr_iterative(A_copy) # A_diag is T
 
-# Imprimir resultados parciales
-print("Matriz U (acumulada de Q's):")
+# Print partial results
+print("U matrix (accumulated Q's):")
 print(U)
-print("\nMatriz casi diagonal (T):")
+print("\nNear-diagonal (T):")
 print(A_diag)
 
-# Comprobación Schur: Reconstruir usando U y T
+# Schur check: Reconstruct using U and T
 A_reconstructed = U @ A_diag @U.conj().T
 
-print(f"Error de reconstrucción de Schur: A - U T U^H = {np.linalg.norm(A - A_reconstructed)}")
+print(f"Schur reconstruction error: A - U T U^H = {np.linalg.norm(A - A_reconstructed)}")
 
-# --------
-# Paso C: Obtener V y los valores singulares (mu_i) usando QR iterativo aplicado a A^T A
-# --------
+# -------------------------------------------------------------------------------
+# Step C: Obtain V and the singular values (mu_i) via QR iteration on A^T A
+# -------------------------------------------------------------------------------
+
 
 """
-Obtener una matriz V y los valores u_i (que serán los valores singulares) tal que U^T A V = diag(u_i)
+Obtain a matrix V and the singular values mu_i such that U^T A V = diag(mu_i), where the eigenvalues
+(or, in the context of the SVD, the squares of the singular values) appear on the diagonal.
 
-La función qr_iterative tranforma A en una forma casi triangular T en la que los autovalores (o, en el contexto de la SVD, los cuadrados de los valores singulares) aparecen en la diagonal
-Los valores singulares se obtienen como u_i = sqrt(lamda_i) con lambda_i autovalores de A^T A
+The singular values are obtained as u_i = sqrt(lambda_i), with lambda_i being the eigenvalues of A^T A
 """
 
 
-# Definimos B = A^T A
+# Define B = A^T A (or A.conj().T @ A for the complex case)
 """
-En el caso real, usar B = A.T @ A y usar B = A.conj().T @ A es equivalente, porque la conjugada de números reales no cambia nada.
-Para que el mismo código funcione también para el caso complejo, usar A.conj().T @ A, que es la manera correcta de obtener A* A
+In the real case, using B = A.T @ A and B = A.conj().T @ A is equivalent,
+since the complex conjugate has no effect on real numbers.
+
+To make the same code work correctly for the complex case as well, use A.conj().T @ A,
+which is the proper way to compute A* A
 """
+
 A_star = A.conj().T # Works for real or complex (complex-conjugate transpose)
 B = A_star @ A
 
-# Aplicamos la misma función QR iterativo a B para obtener V (acumulador de Q's para B) y la forma casi diagonal B_diag
-V, B_approx = qr_iterative(B) # Matriz ortogonal V acumulada y una forma casi diagonal de B
+# Apply the same qr_iterative function on B to get V (the Q accumulation)
+# and the near-diagonal form B_approx
+V, B_approx = qr_iterative(B)
 
-# Los autovalores de B se aproximan a la diagonal de B_diag
-# Se extraen de B_diag, y no de A_diag ya que que los autovalores de A no se relacionan de manera directa con los valores signulares
+# The eigenvalues of B are approximated on the diagonal of B_approx
 lambda_vals = np.diag(B_approx)
 
-# Calcular los valores singulares de A: mu_i = sqrt(lambda_i) (asegurándonos de que sean no negativos)
-# np.maximun(lambda_vals, 0) compara cada valor de lambda_i con 0 y devuelve el mayor de ambos, de esa manera si por errores numéricos y de redondeo lambda_i es ligeramente negativo, se usará 0 en su lugar.
-# Así se asegura estar calculando la raíz cuadrada de números no negativos
+# Compute A's singular values: mu_i = sqrt(lambda_i), ensuring non-negativity
+# np.maximum(lambda_vals, 0) compares each lambda_i with 0 and returns the greater of the two,
+# so if lambda_i is slightly negative due to numerical or rounding errors, 0 will be used instead.
+# This ensures that the square root is only taken of non-negative numbers
+
 mu = np.sqrt(np.maximum(lambda_vals, 0.0))
 
-print("\nValores singulares (mu):")
+print("\nSingular values (mu):")
 print(mu)
-print("\nMatriz V (obtenida a partir del QR iterativo aplicado a A^T A):")
+print("\nMatrix V (obtained from QR on A^T A):")
 print(V)
 
 
 
-# Construir la matriz U
+# Build the U matrix
 """
-La U que se había devuelto trans llamar a qr_iterative(A) proviene de hacer QR sobre la propia A y acumular los factores.
-Esa es la U que diagonaliza o triangulairza A en la forma de Schur, no la U de la descomposición en valores singulares.
+The U returned after calling qr_iterative(A) comes from performing QR on A itself and accumulating the Q factors.
+This is the U that triangularizes A in the Schur form—it is not the U from the singular value decomposition (SVD).
 
-La aproximación se hace diagonalizando B = A^T A, con la V que se obtuvo de qr_iterative(B), ya se tiene la parte derecha de la SVD.
+The approximation is made by diagonalizing B = A^T A. With the V obtained from qr_iterative(B),
+we already have the right-hand side of the SVD.
 
-Ahora se requiere construir U mediante U_i = A v_i / u_i para cada olumna v_i, donde v_i es la i-ésima columna de V y u_i es el valor singular correspondiente.
+Now, we need to construct U using U_i = A @ v_i / u_i for each column v_i,
+where v_i is the i-th column of V and u_i is the corresponding singular value.
 
-La U obtenida al triangularizar A (Schur) está orientada a que A se vuelva triangular (enfocada a autovalores)
-y la que se obtendrá ahora a que A se diagonalice respecto de sus valores singulares
+The U obtained from triangularizing A (Schur form) is focused on turning A into a triangular matrix (i.e., eigenvalue-oriented),
+whereas the U we are about to compute aims to diagonalize A in terms of its singular values.
 """
-# Paso D: Construir la U de la SVD, usando A y V
+
+# -------------------------------------------------------------------------------
+# Step D: Construct the U from the SVD, using A and V
+# -------------------------------------------------------------------------------
+
 U_cols = []
 n = A.shape[0]
 
 for i in range(n):
     """
-    Se puede contruir U porque aplicar A a v_i ya te da la dirección de u_i
+    We can build U because applying A to v_i already gives the direction of u_i
     """
     if np.abs(mu[i]) < 1e-14:
-        # Si mu[i] es aproximandamente 0, elegimos un vector ortonormal cualquiera
-        # Si mu = 0, entonces Av_i = 0. No se puede dividir entre cero, pero se sabe que v_i está en el núcleo (nullspace) de A
-        # Así que u_i puede ser cualquier vectr ortonormal que complete la base
-        # Un vector canónico e_i
+        # If mu[i] is ~0, then A v_i=0 => v_i is in A's nullspace
+        # Use a canonical basis vector e_i
         col_i = np.zeros(n, dtype=A.dtype)
         col_i[i] = 1.0
     else:
-        # col_i = (A @ v_i) / mu_i
+        # Build column i dividing (A v_i) by mu[i]
         v_i = V[:, i]
         col_i = (A @ v_i) / mu[i]
 
     U_cols.append(col_i)
 
-# Convertir lista de columnas en matriz
+# Convert the list of columns into a matrix
 U_temp = np.column_stack(U_cols)
 
-# Ortonormalizar U_temp (QR) para mayor estabilidad numérica
-# En teoría si ya se construyó cada columna como u_i = Av_i / mu, U debería ser ortonormal también, ya que cada v_i lo es, al haber errores de rendondeo, por lo que las columnas de U_temp pueden no ser perfectamente ortogonales
-U_svd, _ = np.linalg.qr(U_temp) # Matriz ortonormal (o unitaria), las columnas de U_svd aproximan los vectores isngulares izquierdos de A
+# Orthonormalize U_temp (QR) for greater numerical stability
+
+U_svd, _ = np.linalg.qr(U_temp) # In theory, if each column was constructed as u_i = A @ v_i / mu, then U should also be orthonormal,
+                                # since each v_i is orthonormal. However, due to rounding errors, the columns of U_temp may not be perfectly orthogonal.
+                                # Orthonormal (or unitary) matrix; the columns of U_svd approximate the left singular vectors of A
 
 
-# Paso F: Validad descompoisicón
+# -------------------------------------------------------------------------------
+# Step F: Validate the decomposition
+# -------------------------------------------------------------------------------
+
 """
-Una vez se tiene U_svd, mu y V, se verifica que
-||U^T A V - diag(u)||_1 < epsilon
+Once we have U_svd, mu, and V, we check that ||U^T A V - diag(mu)||_1 < epsilon
 """
-# Construir diag(mu)
+# Build diag(mu)
 Sigma = np.diag(mu)
 
-# Calcular la diferencia
-M = (U_svd.T @ A) @ V # M es la tranformación completa de A usando las matrices ortogonales (o unitarias) U y V,
+# Compute the difference
+M = (U_svd.T @ A) @ V # M is the full transformation of A using the orthogonal (or unitary) matrices U and V
 
 """
-Existe una libertad de signo en la constucción de los factores U y V, sin alterar la validez de la descomposición
+There is a sign ambiguity in the construction of the U and V factors, which does not affect the validity of the decomposition.
 
-En la SVD, por definición u_i >= 0
+In the SVD, by definition, the singular values u_i must be >= 0.
 
-Basta con cambiar el signo de la columna i-ésima, haciendo que la diagonal sea u_i positiva
+It's enough to flip the sign of the i-th column to ensure that the diagonal entry u_i is positive.
 
-A veces (U^T A V) produce -u_i en la diagonal en lugar de +u_i. Haciendo que la diferencia con diag(mu) sea grande, inflando la norma-1
+Sometimes, (U^T A V) produces -u_i on the diagonal instead of +u_i, which increases the difference from diag(mu),
+artificially inflating the 1-norm.
 """
-# (Tras calcular M = U_svd.T @ A @ V), para forzar que la diagonal de U^T A V sea positiva
+
+# Force the diagonal of M to be positive
+# This sign flip does not affect the orthonormality of U or V, since (-1)⋅(column) remains orthonormal,
+# and it ensures that the diagonal is exactly diag(u_i) >= 0
+
 for i in range(n):
     if M[i, i] < 0:
-        # Este sign flip no altera la ortonormalidad de U o V, pues (-1)⋅(columna) sigue siendo ortonormal,
-        # garantiza que la diagonal sea exactamente diag(u_i) >= 0
         M[:, i] = -M[:, i]
         U_svd[:, i] = -U_svd[:, i]
-# Ahora M debería tener diagonal >= 0
 
-diff = M - Sigma # Verifico la descomposición, uso M para compararla con la matriz diagonal construida a partir de los valores singulares mu
+# Now M should have diagonal >= 0
+
+diff = M - Sigma
+
 
 """
-La norma-1 de una matriz suma los valores absolutos de cada columna por separado,
-el resultado de la norma-1 es el mayor de todas esas sumas
+The 1-norm of a matrix sums the absolute values of each column separately.
+The 1-norm is the max of those column sums.
 """
-# np.max(...) toma el mayor de esos valores
-err_1 = np.max(np.sum(np.abs(diff), axis=0)) # Suma cada columna, axis=0 suma los elementos por columna, es decir, suma verticalmente cada columna de la matriz
+
+err_1 = np.max(np.sum(np.abs(diff), axis=0))  # axis=0 sums the elements column-wise (i.e., vertically across each column)
+                                              # np.max(...) takes the largest of those values
+
 
 print("\nM = U^T A V:")
 print(M)
-print("\nMatriz diagonal:")
+print("\nDiagonal matrix:")
 print(np.diag(mu))
-print(f"\nError final (||U^T A V - diag(mu)||_1): {err_1}")
+print(f"\nFinal error in the 1-norm (||U^T A V - diag(mu)||_1): {err_1}")
 
 epsilon = 1e-12
 if err_1 < epsilon:
-    print("\nLa descomposición cumple: ||U^T A V - diag(μ)||_1 < tol")
+    print("\nThe decomposition satisfies the condition: ||U^T A V - diag(μ)||_1 < tol")
 else:
-    print("\nLa descomposición No cumple la condición deseada.")
+    print("\nThe decomposition does NOT satisfy the desired condition.")
