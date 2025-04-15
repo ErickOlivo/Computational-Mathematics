@@ -221,8 +221,7 @@ print(V)
 
 diff = M - Sigma
 
-"""
-diff = M - Sigma
+
 
 
 """
