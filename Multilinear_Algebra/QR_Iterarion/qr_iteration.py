@@ -19,14 +19,14 @@ def qr_iterative(A, tol=1e-12, max_iter=1000):
     n = A.shape[0]
     U = np.eye(n)    # Accumulator for orthogonal transformations
 
-    iter = 0
+    iteration_count = 0
 
     """
     Continues until A_k converges to a triangular form (real) or quasi-block-triangular (if there are complex values)
 
     The diagonal entries of the converged matrix (final A_k) are the aproximations of the eigenvalues
     """
-    while iter < max_iter:
+    while iteration_count < max_iter:
         # Step 1: Perform the QR decomposition on the current matrix
         Q, R = np.linalg.qr(A)
 
@@ -46,7 +46,7 @@ def qr_iterative(A, tol=1e-12, max_iter=1000):
         if error < tol:
             break
 
-        iter += 1
+        iteration_count += 1
 
     return U, A # Upon exiting, A is almost diagonal and U holds the accumulated Q's
 
@@ -153,6 +153,7 @@ for i in range(n):
     """
     if np.abs(mu[i]) < 1e-14:
         # If mu[i] is ~0, then A v_i=0 => v_i is in A's nullspace
+        # The nullspace (or kernel) of A is the set of vectors x such that A x = 0.
         # Use a canonical basis vector e_i
         col_i = np.zeros(n, dtype=A.dtype)
         col_i[i] = 1.0
@@ -206,8 +207,21 @@ for i in range(n):
         M[:, i] = -M[:, i]
         U_svd[:, i] = -U_svd[:, i]
 
-# Now M should have diagonal >= 0
+                                    # Now M should have diagonal >= 0
 
+
+# ---- LEFT & RIGHT SINGULAR VECTORS ---------------------------------
+print("\nLeft singular vectors (U_svd):")
+print(U_svd)
+
+print("\nRight singular vectors (V):")
+print(V)
+# -------------------------------------------------------------------------------------
+
+
+diff = M - Sigma
+
+"""
 diff = M - Sigma
 
 
