@@ -1,5 +1,5 @@
 import numpy as np
-def qr_iterative(A, tol=1e-8, max_iter=1000):
+def qr_iterative(A, tol=1e-12, max_iter=1000):
     """
     Permita transformar una matriz en una forma de Schur en la cual sus autovalores aparecen en la diagonal.
     A medida que el proceso converge, la matriz resultante muestra estos valores en forma clara.
@@ -37,6 +37,12 @@ def qr_iterative(A, tol=1e-8, max_iter=1000):
         # np.diag(...) se construye de nuevo una matriz diagonal usando esos elementos.
         D = np.diag(np.diag(A))
         # Calcular la norma L1 de los elementos fuera de la diagonal
+
+        """
+        Este error mide cuánto de la matriz A sigue siendo "no diagonal"
+        Cuando eso es muy pequeño, asumimos que A_k ya está casi diagonal, y los autovalores están en la diagonal
+        """
+
         error = np.sum(np.abs(A - D)) # Determina cuándo la parte no diagonal es suficientemente pequeña
         # La idea es que cuando esta suma es muy pequeña podemos decir que los elementos fuera de la diagonal han sido reducidos a casi cero.
         if error < tol:
@@ -86,19 +92,24 @@ Los valores singulares se obtienen como u_i = sqrt(lamda_i) con lambda_i autoval
 
 
 # Definimos B = A^T A
-B = A.T @ A
+"""
+En el caso real, usar B = A.T @ A y usar B = A.conj().T @ A es equivalente, porque la conjugada de números reales no cambia nada.
+Para que el mismo código funcione también para el caso complejo, usar A.conj().T @ A, que es la manera correcta de obtener A* A
+"""
+A_star = A.conj().T # Works for real or complex (complex-conjugate transpose)
+B = A_star @ A
 
 # Aplicamos la misma función QR iterativo a B para obtener V (acumulador de Q's para B) y la forma casi diagonal B_diag
-V, B_diag = qr_iterative(B)
+V, B_approx = qr_iterative(B) # Matriz ortogonal V acumulada y una forma casi diagonal de B
 
-# los autovalores de B se aproximan a la diagonal de B_diag
+# Los autovalores de B se aproximan a la diagonal de B_diag
 # Se extraen de B_diag, y no de A_diag ya que que los autovalores de A no se relacionan de manera directa con los valores signulares
-lambda_vals = np.diag(B_diag)
+lambda_vals = np.diag(B_approx)
 
 # Calcular los valores singulares de A: mu_i = sqrt(lambda_i) (asegurándonos de que sean no negativos)
 # np.maximun(lambda_vals, 0) compara cada valor de lambda_i con 0 y devuelve el mayor de ambos, de esa manera si por errores numéricos y de redondeo lambda_i es ligeramente negativo, se usará 0 en su lugar.
 # Así se asegura estar calculando la raíz cuadrada de números no negativos
-mu = np.sqrt(np.maximum(lambda_vals, 0))
+mu = np.sqrt(np.maximum(lambda_vals, 0.0))
 
 print("\nValores singulares (mu):")
 print(mu)
@@ -106,84 +117,95 @@ print("\nMatriz V (obtenida a partir del QR iterativo aplicado a A^T A):")
 print(V)
 
 
-# --------------------------
-# Paso D: Validar la decomposición completa
-# Se desea que U^T A V sea diagonal con los valores mu en la diagonal.
-# --------------------------
 
-# Calcular M inicial
-M = U.T @ A @ V
+# Construir la matriz U
+"""
+La U que se había devuelto trans llamar a qr_iterative(A) proviene de hacer QR sobre la propia A y acumular los factores.
+Esa es la U que diagonaliza o triangulairza A en la forma de Schur, no la U de la descomposición en valores singulares.
+
+La aproximación se hace diagonalizando B = A^T A, con la V que se obtuvo de qr_iterative(B), ya se tiene la parte derecha de la SVD.
+
+Ahora se requiere construir U mediante U_i = A v_i / u_i para cada olumna v_i, donde v_i es la i-ésima columna de V y u_i es el valor singular correspondiente.
+
+La U obtenida al triangularizar A (Schur) está orientada a que A se vuelva triangular (enfocada a autovalores)
+y la que se obtendrá ahora a que A se diagonalice respecto de sus valores singulares
+"""
+# Paso D: Construir la U de la SVD, usando A y V
+U_cols = []
+n = A.shape[0]
+
+for i in range(n):
+    """
+    Se puede contruir U porque aplicar A a v_i ya te da la dirección de u_i
+    """
+    if np.abs(mu[i]) < 1e-14:
+        # Si mu[i] es aproximandamente 0, elegimos un vector ortonormal cualquiera
+        # Si mu = 0, entonces Av_i = 0. No se puede dividir entre cero, pero se sabe que v_i está en el núcleo (nullspace) de A
+        # Así que u_i puede ser cualquier vectr ortonormal que complete la base
+        # Un vector canónico e_i
+        col_i = np.zeros(n, dtype=A.dtype)
+        col_i[i] = 1.0
+    else:
+        # col_i = (A @ v_i) / mu_i
+        v_i = V[:, i]
+        col_i = (A @ v_i) / mu[i]
+
+    U_cols.append(col_i)
+
+# Convertir lista de columnas en matriz
+U_temp = np.column_stack(U_cols)
+
+# Ortonormalizar U_temp (QR) para mayor estabilidad numérica
+# En teoría si ya se construyó cada columna como u_i = Av_i / mu, U debería ser ortonormal también, ya que cada v_i lo es, al haber errores de rendondeo, por lo que las columnas de U_temp pueden no ser perfectamente ortogonales
+U_svd, _ = np.linalg.qr(U_temp) # Matriz ortonormal (o unitaria), las columnas de U_svd aproximan los vectores isngulares izquierdos de A
 
 
+# Paso F: Validad descompoisicón
+"""
+Una vez se tiene U_svd, mu y V, se verifica que
+||U^T A V - diag(u)||_1 < epsilon
+"""
+# Construir diag(mu)
+Sigma = np.diag(mu)
 
-# Ajustar los signos de las columnas de U en función de la diagonal de M:
-diag_M = np.diag(M)
-for i in range(len(diag_M)):
-    if diag_M[i] < 0:
-        # Cambiamos el signo de la columna i de U para invertir el signo correspondiente en M.
-        U[:, i] = -U[:, i]
+# Calcular la diferencia
+M = (U_svd.T @ A) @ V # M es la tranformación completa de A usando las matrices ortogonales (o unitarias) U y V,
 
+"""
+Existe una libertad de signo en la constucción de los factores U y V, sin alterar la validez de la descomposición
 
-# Recalcular M con los signos ajustados:
-M = U.T @ A @ V
+En la SVD, por definición u_i >= 0
 
-# Ahora, para la validación:
-# Se compara la matriz M con la matriz diagonal esperada,
-# que es np.diag(μ). Como la diagonal de M puede haber quedado con pequeños errores numéricos,
-# medimos:
-#  - La diferencia entre los valores absolutos de la diagonal de M y μ (error_diag)
-#  - La suma de las entradas fuera de la diagonal (error_offdiag)
-M_diag = np.diag(np.diag(M))
-mu_diag = np.abs(np.diag(M))  # Consideramos los valores absolutos para comparar con μ
+Basta con cambiar el signo de la columna i-ésima, haciendo que la diagonal sea u_i positiva
 
-error_final = np.sum(np.abs(M_diag - np.diag(mu)))
+A veces (U^T A V) produce -u_i en la diagonal en lugar de +u_i. Haciendo que la diferencia con diag(mu) sea grande, inflando la norma-1
+"""
+# (Tras calcular M = U_svd.T @ A @ V), para forzar que la diagonal de U^T A V sea positiva
+for i in range(n):
+    if M[i, i] < 0:
+        # Este sign flip no altera la ortonormalidad de U o V, pues (-1)⋅(columna) sigue siendo ortonormal,
+        # garantiza que la diagonal sea exactamente diag(u_i) >= 0
+        M[:, i] = -M[:, i]
+        U_svd[:, i] = -U_svd[:, i]
+# Ahora M debería tener diagonal >= 0
 
+diff = M - Sigma # Verifico la descomposición, uso M para compararla con la matriz diagonal construida a partir de los valores singulares mu
+
+"""
+La norma-1 de una matriz suma los valores absolutos de cada columna por separado,
+el resultado de la norma-1 es el mayor de todas esas sumas
+"""
+# np.max(...) toma el mayor de esos valores
+err_1 = np.max(np.sum(np.abs(diff), axis=0)) # Suma cada columna, axis=0 suma los elementos por columna, es decir, suma verticalmente cada columna de la matriz
 
 print("\nM = U^T A V:")
 print(M)
-print("\nMatriz diagonal extraída de M (con los valores ajustados):")
-print(M_diag)
-print(f"\nError final (||M - diag(μ)||_1): {error_final}")
+print("\nMatriz diagonal:")
+print(np.diag(mu))
+print(f"\nError final (||U^T A V - diag(mu)||_1): {err_1}")
 
-epsilon = 1e-20
-if error_final < epsilon:
+epsilon = 1e-12
+if err_1 < epsilon:
     print("\nLa descomposición cumple: ||U^T A V - diag(μ)||_1 < tol")
 else:
     print("\nLa descomposición No cumple la condición deseada.")
-
-
-
-
-
-
-
-
-"""
-# Extraer la parte diagonal de M
-M_diag = np.diag(np.diag(M))
-
-# Calcular el error L1 de la diferencia
-error_final = np.sum(np.abs(M - M_diag))
-
-
-
-
-mu_diag = np.abs(np.diag(M))
-error_diag = np.sum(np.abs(mu_diag - mu))
-error_offdiag = np.sum(np.abs(M - np.diag(np.diag(M))))
-error_final = error_diag + error_offdiag
-
-
-
-print("\nM = U^T A V:")
-print(M)
-print("\nMatriz diagonal extraída de M:")
-print(M_diag)
-print(f"\nError final (||M - diag(M)||_1): {error_final}")
-
-epsilon = 1e-20
-if error_final < epsilon:
-    print("\nLa descomposición cumple: ||U^T A V - diag(mu)||_1 < tol")
-else:
-    print("\nLa descomposición No cumple la condición deseada.")
-"""
